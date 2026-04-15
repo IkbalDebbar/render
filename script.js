@@ -43,6 +43,7 @@
   const servoAngleBar = $('servoAngleBar');
   const servoAngleMarker = $('servoAngleMarker');
   const servoStateEl = $('servoState');
+  socket = io();
   
 
   /* ── Connection ── */
