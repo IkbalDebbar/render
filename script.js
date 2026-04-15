@@ -54,75 +54,69 @@
     btnConnect.textContent = 'Connecting...';
     btnConnect.disabled = true;
 
-    try {
-      socket = io("https://render-lboq.onrender.com", {
-        transports: ["websocket", "polling"],
-        timeout: 8000
-      });
+    
 
-      socket.on('connect', () => {
-        console.log("Connected to Render server")
-        handleConnectionSuccess();
-      });
+  function connectToRobot() {
+    socket = io("https://render-lboq.onrender.com", {
+      transports: ["websocket", "polling"],
+      timeout: 8000
+  });
 
-      socket.on('auth_result', data => {
-        if (data.success) {
-          handleConnectionSuccess(ip, port);
-        } else {
-          connectError.textContent = data.message || 'Authentication failed';
-          socket.disconnect();
-          resetConnectBtn();
-        }
-      });
+  socket.on("connect", () => {
+    console.log("Connected to Render server");
+    handleConnectionSuccess();
+  });
 
-      socket.on('connected', data => {
-        addLog(data.message, 'info');
-      });
+  socket.on("connect_error", (err) => {
+    console.log("Connection error:", err);
+    connectError.textContent = "Cannot connect to server";
+    resetConnectBtn();
+  });
 
-      socket.on('disconnect', () => {
-        setConnected(false);
-        addLog('Disconnected', 'error');
-      });
+  socket.on("disconnect", () => {
+    console.log("Disconnected from server");
+    setConnected(false);
+    addLog("Disconnected", "error");
+  });
 
-      socket.on('connect_error', () => {
-        connectError.textContent = 'Cannot reach the robot. Check IP and port.';
-        socket.disconnect();
-        resetConnectBtn();
-      });
-      socket.on("command", (data) => {
-        console.log("Command received:", data);
-      });
+  socket.on("command", (data) => {
+    console.log("Command received:", data);
+  });
 
-      /* ── Server Events ── */
-      socket.on('distance_update', data => updateDistance(data.value));
-      socket.on('motor_update', data => updateMotors(data));
-      socket.on('voltage_update', data => updateVoltage(data.value));
-      socket.on('status_update', data => addLog(data.message, data.type));
-      socket.on('camera_response', data => addLog(data.message, data.type === 'ok' ? 'success' : 'error'));
-      socket.on('auto_mode_update', data => {
-        autoMode = data.enabled;
-        $('toggleAuto').classList.toggle('active', autoMode);
-      });
+  socket.on("distance_update", (data) => updateDistance(data.value));
+  socket.on("motor_update", (data) => updateMotors(data));
+  socket.on("voltage_update", (data) => updateVoltage(data.value));
+  socket.on("status_update", (data) => addLog(data.message, data.type));
 
-      /* ── Servo Events ── */
-      socket.on('servo_update', data => {
-        const angle = typeof data.angle === 'number' ? data.angle : parseInt(data.angle);
-        if (!isNaN(angle)) {
-          currentServoAngle = angle;
-          servoMoving = false;
-          updateServoUI(angle, false);
-          addLog(`Servo positioned at ${angle}\u00B0`, 'info');
-        }
-      });
-      socket.on('servo_moving', data => {
-        servoMoving = true;
-        updateServoState('Moving', true);
-      });
+  socket.on("camera_response", (data) => {
+    addLog(
+      data.message,
+      data.type === "ok" ? "success" : "error"
+    );
+  });
 
-    } catch(e) {
-      connectError.textContent = 'Connection error: ' + e.message;
-      resetConnectBtn();
+  socket.on("auto_mode_update", (data) => {
+    autoMode = data.enabled;
+    document.getElementById("toggleAuto").classList.toggle("active", autoMode);
+  });
+
+  socket.on("servo_update", (data) => {
+    const angle = parseInt(data.angle);
+    if (!isNaN(angle)) {
+      currentServoAngle = angle;
+      servoMoving = false;
+      updateServoUI(angle, false);
+      addLog(`Servo positioned at ${angle}°`, "info");
     }
+  });
+
+  socket.on("servo_moving", () => {
+    servoMoving = true;
+    updateServoState("Moving", true);
+  });
+}
+
+    
   }
 
   function handleConnectionSuccess(ip, port) {
