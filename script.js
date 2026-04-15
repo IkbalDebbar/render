@@ -2,7 +2,7 @@
   'use strict';
 
   /* ── State ── */
-  let socket = null;
+  
   let currentSpeed = 80;
   let autoMode = false;
   let isRecording = false;
@@ -43,7 +43,7 @@
   const servoAngleBar = $('servoAngleBar');
   const servoAngleMarker = $('servoAngleMarker');
   const servoStateEl = $('servoState');
-  socket = io(https://render-lboq.onrender.com);
+  const socket = io(https://render-lboq.onrender.com);
 
   /* ── Connection ── */
   function connect() {
