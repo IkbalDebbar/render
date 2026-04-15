@@ -2,7 +2,7 @@
   'use strict';
 
   /* ── State ── */
-  
+  let socket = null;
   let currentSpeed = 80;
   let autoMode = false;
   let isRecording = false;
