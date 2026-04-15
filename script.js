@@ -122,7 +122,7 @@
   function handleConnectionSuccess(ip, port) {
       overlay.classList.add('hidden');
       setConnected(true);
-      videoFeed.src = `http://10.127.21.206:5000/video_feed`;
+      videoFeed.src = `http://${ip}:${port}/video_feed`;
       videoFeed.style.display = 'block';
       videoPlaceholder.style.display = 'none';
       badgeLive.classList.add('live');
