@@ -89,6 +89,9 @@
         socket.disconnect();
         resetConnectBtn();
       });
+      socket.on("command", (data) => {
+        console.log("Command received:", data);
+      });
 
       /* ── Server Events ── */
       socket.on('distance_update', data => updateDistance(data.value));
