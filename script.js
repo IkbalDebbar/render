@@ -43,7 +43,7 @@
   const servoAngleBar = $('servoAngleBar');
   const servoAngleMarker = $('servoAngleMarker');
   const servoStateEl = $('servoState');
-  const socket = io(https://render-lboq.onrender.com);
+  
 
   /* ── Connection ── */
   function connect() {
@@ -55,8 +55,8 @@
     btnConnect.disabled = true;
 
     try {
-      socket = io(`http://${ip}:${port}`, {
-        transports: ['websocket', 'polling'],
+      socket = io("https://render-lboq.onrender.com", {
+        transports: ["websocket", "polling"],
         timeout: 8000
       });
 
