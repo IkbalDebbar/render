@@ -55,10 +55,9 @@
     btnConnect.disabled = true;
 
     try {
-      function connectToRobot() {
-  socket = io("https://render-lboq.onrender.com", {
-    transports: ["websocket", "polling"],
-    timeout: 8000
+      socket = io("https://render-lboq.onrender.com", {
+        transports: ["websocket", "polling"],
+        timeout: 8000
       });
 
       socket.on('connect', () => {
