@@ -61,7 +61,8 @@
       });
 
       socket.on('connect', () => {
-        handleConnectionSuccess(ip, port);
+        console.log("Connected to Render server")
+        handleConnectionSuccess();
       });
 
       socket.on('auth_result', data => {
