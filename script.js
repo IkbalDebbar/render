@@ -43,7 +43,7 @@
   const servoAngleBar = $('servoAngleBar');
   const servoAngleMarker = $('servoAngleMarker');
   const servoStateEl = $('servoState');
-  socket = io();
+  socket = io(https://render-lboq.onrender.com);
 
   /* ── Connection ── */
   function connect() {
