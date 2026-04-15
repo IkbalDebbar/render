@@ -150,14 +150,6 @@ body::after {
   color: var(--danger); font-size: 12px; margin-top: 12px;
   min-height: 18px;
 }
-.vpn-hint {
-  margin-top: 20px; padding: 12px;
-  background: rgba(255,140,66,0.08);
-  border: 1px solid rgba(255,140,66,0.2);
-  border-radius: 8px; font-size: 11px; color: var(--warning);
-  text-align: left;
-}
-.vpn-hint i { margin-right: 6px; }
 
 /* ── Main Layout ── */
 .main-grid {
