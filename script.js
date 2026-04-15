@@ -9,8 +9,8 @@
   let sequenceRunning = false;
   let sequence = [];
   let joystickActive = false;
-  let currentServoAngle = 90;
-  let targetServoAngle = 90;
+  let currentServoAngle = 90;     // tracks the actual reported angle
+  let targetServoAngle = 90;      // the angle we last requested
   let servoMoving = false;
 
   /* ── DOM refs ── */
@@ -43,7 +43,6 @@
   const servoAngleBar = $('servoAngleBar');
   const servoAngleMarker = $('servoAngleMarker');
   const servoStateEl = $('servoState');
-  
 
   /* ── Connection ── */
   function connect() {
@@ -54,69 +53,73 @@
     btnConnect.textContent = 'Connecting...';
     btnConnect.disabled = true;
 
-    
+    try {
+      socket = io("https://render-lboq.onrender.com", {
+        transports: ["websocket", "polling"],
+        timeout: 8000
+      });
 
-  function connectToRobot() {
-    socket = io("https://render-lboq.onrender.com", {
-      transports: ["websocket", "polling"],
-      timeout: 8000
-  });
+      socket.on('connect', () => {
+        handleConnectionSuccess(ip, port);
+      });
 
-  socket.on("connect", () => {
-    console.log("Connected to Render server");
-    handleConnectionSuccess();
-  });
+      socket.on('auth_result', data => {
+        if (data.success) {
+          handleConnectionSuccess(ip, port);
+        } else {
+          connectError.textContent = data.message || 'Authentication failed';
+          socket.disconnect();
+          resetConnectBtn();
+        }
+      });
 
-  socket.on("connect_error", (err) => {
-    console.log("Connection error:", err);
-    connectError.textContent = "Cannot connect to server";
-    resetConnectBtn();
-  });
+      socket.on('connected', data => {
+        addLog(data.message, 'info');
+      });
 
-  socket.on("disconnect", () => {
-    console.log("Disconnected from server");
-    setConnected(false);
-    addLog("Disconnected", "error");
-  });
+      socket.on('disconnect', () => {
+        setConnected(false);
+        addLog('Disconnected', 'error');
+      });
 
-  socket.on("command", (data) => {
-    console.log("Command received:", data);
-  });
+      socket.on('connect_error', () => {
+        connectError.textContent = 'Cannot reach the robot. Check IP, port, and VPN.';
+        socket.disconnect();
+        resetConnectBtn();
+      });
 
-  socket.on("distance_update", (data) => updateDistance(data.value));
-  socket.on("motor_update", (data) => updateMotors(data));
-  socket.on("voltage_update", (data) => updateVoltage(data.value));
-  socket.on("status_update", (data) => addLog(data.message, data.type));
+      /* ── Server Events ── */
+      socket.on('distance_update', data => updateDistance(data.value));
+      socket.on('motor_update', data => updateMotors(data));
+      socket.on('voltage_update', data => updateVoltage(data.value));
+      socket.on('status_update', data => addLog(data.message, data.type));
+      socket.on('camera_response', data => addLog(data.message, data.type === 'ok' ? 'success' : 'error'));
+      socket.on('auto_mode_update', data => {
+        autoMode = data.enabled;
+        $('toggleAuto').classList.toggle('active', autoMode);
+      });
 
-  socket.on("camera_response", (data) => {
-    addLog(
-      data.message,
-      data.type === "ok" ? "success" : "error"
-    );
-  });
+      /* ── Servo Events ── */
+      socket.on('servo_update', data => {
+        // Server confirms the servo moved to this angle
+        const angle = typeof data.angle === 'number' ? data.angle : parseInt(data.angle);
+        if (!isNaN(angle)) {
+          currentServoAngle = angle;
+          servoMoving = false;
+          updateServoUI(angle, false);
+          addLog(`Servo positioned at ${angle}\u00B0`, 'info');
+        }
+      });
+      socket.on('servo_moving', data => {
+        // Server says servo is in transit
+        servoMoving = true;
+        updateServoState('Moving', true);
+      });
 
-  socket.on("auto_mode_update", (data) => {
-    autoMode = data.enabled;
-    document.getElementById("toggleAuto").classList.toggle("active", autoMode);
-  });
-
-  socket.on("servo_update", (data) => {
-    const angle = parseInt(data.angle);
-    if (!isNaN(angle)) {
-      currentServoAngle = angle;
-      servoMoving = false;
-      updateServoUI(angle, false);
-      addLog(`Servo positioned at ${angle}°`, "info");
+    } catch(e) {
+      connectError.textContent = 'Connection error: ' + e.message;
+      resetConnectBtn();
     }
-  });
-
-  socket.on("servo_moving", () => {
-    servoMoving = true;
-    updateServoState("Moving", true);
-  });
-}
-
-    
   }
 
   function handleConnectionSuccess(ip, port) {
@@ -164,12 +167,14 @@
 
   function drawJoystick() {
     jCtx.clearRect(0, 0, 220, 220);
+    // Outer ring
     jCtx.beginPath();
     jCtx.arc(jCx, jCy, jMaxR + 8, 0, Math.PI * 2);
     jCtx.strokeStyle = 'rgba(0,229,160,0.12)';
     jCtx.lineWidth = 2;
     jCtx.stroke();
 
+    // Direction arrows
     jCtx.save();
     jCtx.translate(jCx, jCy);
     const arrows = [
@@ -184,17 +189,20 @@
     });
     jCtx.restore();
 
+    // Cross-hair
     jCtx.strokeStyle = 'rgba(0,229,160,0.06)';
     jCtx.lineWidth = 1;
     jCtx.beginPath(); jCtx.moveTo(jCx, jCy - jMaxR); jCtx.lineTo(jCx, jCy + jMaxR); jCtx.stroke();
     jCtx.beginPath(); jCtx.moveTo(jCx - jMaxR, jCy); jCtx.lineTo(jCx + jMaxR, jCy); jCtx.stroke();
 
+    // Track circle
     jCtx.beginPath();
     jCtx.arc(jCx, jCy, jMaxR, 0, Math.PI * 2);
     jCtx.strokeStyle = 'rgba(0,229,160,0.15)';
     jCtx.lineWidth = 1.5;
     jCtx.stroke();
 
+    // Line from center to knob
     jCtx.beginPath();
     jCtx.moveTo(jCx, jCy);
     jCtx.lineTo(jKnobX, jKnobY);
@@ -202,6 +210,7 @@
     jCtx.lineWidth = 2;
     jCtx.stroke();
 
+    // Knob glow
     const grad = jCtx.createRadialGradient(jKnobX, jKnobY, 0, jKnobX, jKnobY, jKnobR + 10);
     grad.addColorStop(0, 'rgba(0,229,160,0.25)');
     grad.addColorStop(1, 'rgba(0,229,160,0)');
@@ -210,6 +219,7 @@
     jCtx.arc(jKnobX, jKnobY, jKnobR + 10, 0, Math.PI * 2);
     jCtx.fill();
 
+    // Knob
     jCtx.beginPath();
     jCtx.arc(jKnobX, jKnobY, jKnobR, 0, Math.PI * 2);
     const kGrad = jCtx.createRadialGradient(jKnobX - 4, jKnobY - 4, 0, jKnobX, jKnobY, jKnobR);
@@ -221,6 +231,7 @@
     jCtx.lineWidth = 2;
     jCtx.stroke();
 
+    // Center dot
     jCtx.beginPath();
     jCtx.arc(jKnobX, jKnobY, 4, 0, Math.PI * 2);
     jCtx.fillStyle = jDragging ? '#00e5a0' : 'rgba(0,229,160,0.4)';
@@ -380,20 +391,24 @@
       if (!socket || !socket.connected) return;
       const angle = parseInt(this.dataset.angle);
 
+      // Don't re-send if already at this angle and not moving
       if (angle === currentServoAngle && !servoMoving) return;
 
       targetServoAngle = angle;
       servoMoving = true;
 
+      // Update buttons visual immediately
       servoBtns.forEach(b => {
         b.classList.remove('active', 'moving');
       });
       this.classList.add('moving');
 
+      // Update display to show target
       servoAngleNum.textContent = angle;
       updateServoState('Moving', true);
       updateServoBars(angle);
 
+      // Send command to server
       socket.emit('servo_control', { angle: angle });
 
       addLog(`Servo moving to ${angle}\u00B0`, 'info');
@@ -405,6 +420,7 @@
     servoStatusAngle.textContent = angle + '\u00B0';
     updateServoBars(angle);
 
+    // Update button highlights
     servoBtns.forEach(b => {
       b.classList.remove('active', 'moving');
       if (parseInt(b.dataset.angle) === angle) {
@@ -432,7 +448,7 @@
   /* ── Servo Visual Canvas ── */
   const sCanvas = $('servoCanvas');
   const sCtx = sCanvas.getContext('2d');
-  let displayServoAngle = 90;
+  let displayServoAngle = 90; // smoothly animated display angle
 
   function drawServoVisual() {
     const w = 260, h = 100;
@@ -440,6 +456,7 @@
 
     sCtx.clearRect(0, 0, w, h);
 
+    // Smoothly animate toward target
     const diff = targetServoAngle - displayServoAngle;
     if (Math.abs(diff) > 0.5) {
       displayServoAngle += diff * 0.12;
@@ -447,10 +464,12 @@
       displayServoAngle = targetServoAngle;
     }
 
+    // Arc track
     const arcR = 65;
-    const startA = Math.PI;
-    const endA = 0;
+    const startA = Math.PI;          // 180deg = left
+    const endA = 0;                  // 0deg = right (canvas coords)
 
+    // Background arc
     sCtx.beginPath();
     sCtx.arc(cx, cy, arcR, startA, endA);
     sCtx.strokeStyle = 'rgba(28,42,69,0.6)';
@@ -458,6 +477,7 @@
     sCtx.lineCap = 'round';
     sCtx.stroke();
 
+    // Active arc (from 180 to current angle)
     const currentRad = Math.PI - (displayServoAngle / 180) * Math.PI;
     sCtx.beginPath();
     sCtx.arc(cx, cy, arcR, startA, currentRad);
@@ -470,6 +490,7 @@
     sCtx.lineCap = 'round';
     sCtx.stroke();
 
+    // Tick marks at 0, 90, 180
     [0, 90, 180].forEach(deg => {
       const rad = Math.PI - (deg / 180) * Math.PI;
       const inner = arcR - 10;
@@ -481,6 +502,7 @@
       sCtx.lineWidth = 1.5;
       sCtx.stroke();
 
+      // Label
       const labelR = arcR + 20;
       sCtx.fillStyle = 'rgba(106,123,150,0.5)';
       sCtx.font = '9px JetBrains Mono';
@@ -489,11 +511,13 @@
       sCtx.fillText(deg + '\u00B0', cx + Math.cos(rad) * labelR, cy + Math.sin(rad) * labelR);
     });
 
+    // Needle / pointer
     const needleLen = arcR - 4;
     const needleRad = Math.PI - (displayServoAngle / 180) * Math.PI;
     const nx = cx + Math.cos(needleRad) * needleLen;
     const ny = cy + Math.sin(needleRad) * needleLen;
 
+    // Needle glow
     sCtx.shadowColor = servoMoving ? '#ff8c42' : '#00e5a0';
     sCtx.shadowBlur = 12;
     sCtx.beginPath();
@@ -505,6 +529,7 @@
     sCtx.stroke();
     sCtx.shadowBlur = 0;
 
+    // Center pivot
     sCtx.beginPath();
     sCtx.arc(cx, cy, 6, 0, Math.PI * 2);
     const pivGrad = sCtx.createRadialGradient(cx - 1, cy - 1, 0, cx, cy, 6);
@@ -516,6 +541,7 @@
     sCtx.lineWidth = 1.5;
     sCtx.stroke();
 
+    // Sensor icon at tip
     sCtx.beginPath();
     sCtx.arc(nx, ny, 4, 0, Math.PI * 2);
     sCtx.fillStyle = servoMoving ? '#ff8c42' : '#00e5a0';
@@ -618,6 +644,7 @@
     const w = 320, h = 320, cx = 160, cy = 160, r = 130;
     gCtx.clearRect(0, 0, w, h);
 
+    // Background arc
     gCtx.beginPath();
     gCtx.arc(cx, cy, r, 0.75 * Math.PI, 2.25 * Math.PI);
     gCtx.strokeStyle = 'rgba(28,42,69,0.6)';
@@ -625,6 +652,7 @@
     gCtx.lineCap = 'round';
     gCtx.stroke();
 
+    // Value arc
     const pct = Math.min(1, Math.max(0, dist / 200));
     const endAngle = 0.75 * Math.PI + pct * 1.5 * Math.PI;
     let color = '#00e5a0';
@@ -638,6 +666,7 @@
     gCtx.lineCap = 'round';
     gCtx.stroke();
 
+    // Glow on arc
     gCtx.shadowColor = color;
     gCtx.shadowBlur = 15;
     gCtx.beginPath();
@@ -648,6 +677,7 @@
     gCtx.stroke();
     gCtx.shadowBlur = 0;
 
+    // Tick marks
     for (let i = 0; i <= 10; i++) {
       const angle = 0.75 * Math.PI + (i / 10) * 1.5 * Math.PI;
       const innerR = r - 18;
@@ -660,6 +690,7 @@
       gCtx.stroke();
     }
 
+    // Labels
     gCtx.fillStyle = 'rgba(106,123,150,0.5)';
     gCtx.font = '10px JetBrains Mono';
     gCtx.textAlign = 'center';
